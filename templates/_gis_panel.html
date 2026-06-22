@@ -1,0 +1,71 @@
+{# Reusable GIS panel for dashboard and GIS page - integrated in dashboard layout #}
+<div class="lg:col-span-2 glass-panel rounded-xl p-5 shadow-lg border border-slate-900/60">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h3 class="text-sm font-bold text-slate-200" style="font-family: 'Roboto Slab', serif;">Peta Wilayah — Prediksi AI</h3>
+            <p class="text-[11px] text-slate-400 font-mono mt-0.5">Choropleth volume prediksi per kecamatan</p>
+        </div>
+        <div class="text-xs font-mono text-slate-400">Layer: <span class="text-emerald-400">Prediksi</span></div>
+    </div>
+
+    <div id="dashboardMap" class="w-full h-80 rounded-lg overflow-hidden border border-slate-900/40"></div>
+
+    <div class="mt-3 flex items-center gap-3">
+        <button id="mapZoomHome" class="px-3 py-1 bg-slate-950/40 border border-slate-900/60 rounded text-xs text-slate-200">Zoom to data</button>
+        <button id="mapToggleLegend" class="px-3 py-1 bg-slate-950/40 border border-slate-900/60 rounded text-xs text-slate-200">Toggle Legend</button>
+        <div class="ml-auto text-[11px] font-mono text-slate-400">Sumber: OSM / CartoDB</div>
+    </div>
+
+    <!-- Legend (hidden by default) -->
+    <div id="dashboardMapLegend" class="hidden mt-3 info-legend p-3 text-xs">
+        <div class="font-bold text-slate-200 mb-2">Prediksi (ton)</div>
+        <div class="flex items-center justify-between"><span>&lt; 5</span><span class="w-8 h-3 rounded-sm" style="background:#edf8fb"></span></div>
+        <div class="flex items-center justify-between"><span>5 - 8</span><span class="w-8 h-3 rounded-sm" style="background:#b2e2e2"></span></div>
+        <div class="flex items-center justify-between"><span>8 - 12</span><span class="w-8 h-3 rounded-sm" style="background:#66c2a4"></span></div>
+        <div class="flex items-center justify-between"><span>12 - 16</span><span class="w-8 h-3 rounded-sm" style="background:#2ca25f"></span></div>
+        <div class="flex items-center justify-between"><span>&gt; 16</span><span class="w-8 h-3 rounded-sm" style="background:#006d2c"></span></div>
+    </div>
+
+    <!-- Leaflet assets & map init (scoped to this panel) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        (function(){
+            const mapEl = document.getElementById('dashboardMap');
+            if(!mapEl) return;
+
+            const map = L.map('dashboardMap', { zoomControl: true }).setView([-6.9147, 107.6098], 12);
+            window.dashboardMap = map; // expose for resize from main.js
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CartoDB & OpenStreetMap', maxZoom: 19
+            }).addTo(map);
+
+            function getColor(d){
+                return d > 16 ? '#006d2c' : d > 12 ? '#2ca25f' : d > 8 ? '#66c2a4' : d > 5 ? '#b2e2e2' : '#edf8fb';
+            }
+            function style(feature){ const v = feature.properties && feature.properties.volume_prediksi ? feature.properties.volume_prediksi : 0; return { weight:1, color:'#111827', fillOpacity:0.85, fillColor:getColor(v) }; }
+
+            const info = L.control({position:'topleft'});
+            info.onAdd = function(){ this._div = L.DomUtil.create('div','info-legend'); this._div.style.background='rgba(15,23,42,0.85)'; this._div.style.color='#e2e8f0'; this._div.style.padding='6px 8px'; this._div.style.borderRadius='6px'; this.update(); return this._div; };
+            info.update = function(props){ if(!props) this._div.innerHTML = '<b>Hover area</b><br>Hover kecamatan untuk detail'; else this._div.innerHTML = `<b>${props.nama || props.nama_kecamatan}</b><br>Prediksi: ${props.volume_prediksi || 0} ton`; };
+            info.addTo(map);
+
+            let geojsonLayer = null;
+            fetch('{{ url_for("gis.get_geojson_data") }}').then(r=>r.json()).then(data=>{
+                geojsonLayer = L.geoJSON(data, { style: style, onEachFeature:function(feature, layer){
+                    layer.on({ mouseover:function(e){ e.target.setStyle({weight:2}); info.update(e.target.feature.properties); }, mouseout:function(e){ geojsonLayer.resetStyle(e.target); info.update(); }, click:function(e){ const p=feature.properties||{}; const html=`<div style="min-width:200px"><h4 style="margin:0 0 6px 0">${p.nama||p.nama_kecamatan||'Unknown'}</h4><div><strong>Populasi:</strong> ${p.populasi||0}</div><div><strong>Prediksi:</strong> ${p.volume_prediksi||0} ton</div></div>`; layer.bindPopup(html,{maxWidth:320}).openPopup(); } }); } }).addTo(map);
+                if(geojsonLayer.getLayers().length) map.fitBounds(geojsonLayer.getBounds(), {padding:[8,8]});
+            }).catch(err=>{ console.error('geojson load', err); });
+
+            // Legend toggle buttons
+            const legendEl = document.getElementById('dashboardMapLegend');
+            document.getElementById('mapToggleLegend').addEventListener('click', ()=>{ legendEl.classList.toggle('hidden'); map.invalidateSize(); });
+            document.getElementById('mapZoomHome').addEventListener('click', ()=>{ if(geojsonLayer) map.fitBounds(geojsonLayer.getBounds(), {padding:[8,8]}); });
+
+            // Resize hook for global sidebar toggle
+            document.addEventListener('sidebar:resized', ()=> setTimeout(()=> map.invalidateSize(), 260));
+        })();
+    </script>
+</div>

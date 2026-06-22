@@ -1,0 +1,149 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z01",
+        "name": "Zona Pasar Baru",
+        "kecamatan": "Kec. Gambir"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.815, -6.155],
+          [106.835, -6.155],
+          [106.835, -6.175],
+          [106.815, -6.175],
+          [106.815, -6.155]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z02",
+        "name": "Zona Thamrin",
+        "kecamatan": "Kec. Menteng"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.810, -6.180],
+          [106.830, -6.180],
+          [106.830, -6.205],
+          [106.810, -6.205],
+          [106.810, -6.180]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z03",
+        "name": "Zona Kemang",
+        "kecamatan": "Kec. Mampang"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.795, -6.245],
+          [106.820, -6.245],
+          [106.820, -6.275],
+          [106.795, -6.275],
+          [106.795, -6.245]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z04",
+        "name": "Zona Kota Tua",
+        "kecamatan": "Kec. Penjaringan"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.790, -6.115],
+          [106.825, -6.115],
+          [106.825, -6.145],
+          [106.790, -6.145],
+          [106.790, -6.115]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z05",
+        "name": "Zona Kelapa Gading",
+        "kecamatan": "Kec. Kel. Gading"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.880, -6.145],
+          [106.910, -6.145],
+          [106.910, -6.175],
+          [106.880, -6.175],
+          [106.880, -6.145]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z06",
+        "name": "Zona Cempaka Mas",
+        "kecamatan": "Kec. Kemayoran"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.840, -6.155],
+          [106.870, -6.155],
+          [106.870, -6.185],
+          [106.840, -6.185],
+          [106.840, -6.155]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z07",
+        "name": "Zona Kebayoran",
+        "kecamatan": "Kec. Kby. Baru"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.775, -6.225],
+          [106.805, -6.225],
+          [106.805, -6.255],
+          [106.775, -6.255],
+          [106.775, -6.225]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "Z08",
+        "name": "Zona Pulo Gadung",
+        "kecamatan": "Kec. Pulo Gadung"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [106.875, -6.175],
+          [106.910, -6.175],
+          [106.910, -6.205],
+          [106.875, -6.205],
+          [106.875, -6.175]
+        ]]
+      }
+    }
+  ]
+}

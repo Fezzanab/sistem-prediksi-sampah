@@ -1,0 +1,493 @@
+{% extends 'base.html' %}
+
+{% block title %}Peta GIS Kota Bandung — Smart Waste Prediction{% endblock %}
+{% block page_title %}GIS Smart Waste Map{% endblock %}
+{% block page_subtitle %}Visualisasi spasial prediksi timbulan sampah 30 kecamatan Kota Bandung{% endblock %}
+
+{% block head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+  /* ── Full-screen map overrides ── */
+  #gis-root          { display: flex; flex-direction: column; height: calc(100vh - 140px); min-height: 560px; gap: 12px; }
+  #map-wrapper       { position: relative; flex: 1; border-radius: 14px; overflow: hidden;
+                       box-shadow: 0 8px 32px rgba(0,0,0,.18); border: 1.5px solid #e2e8f0; }
+  #map               { width: 100%; height: 100%; background: #f8fafc; }
+
+  /* Leaflet popup overrides */
+  .leaflet-popup-content-wrapper {
+    background: #ffffff; border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.15); border: 1px solid #e2e8f0;
+  }
+  .leaflet-popup-tip { background: #ffffff; }
+  .leaflet-popup-content { margin: 12px 14px; font-family: 'Inter', sans-serif; }
+
+  /* Legend overlay */
+  .gis-legend {
+    background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+    border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 12px 14px; font-size: 11px; font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  }
+
+  /* Map badge overlay */
+  .map-badge {
+    position: absolute; z-index: 1000; top: 14px; left: 14px;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(10px);
+    border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 8px 14px; font-size: 11px; font-weight: 700;
+    color: #1e40af; letter-spacing: .05em; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  }
+  .map-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; animation: blink 1.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* Toolbar */
+  #filter-toolbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: rgba(255,255,255,.95); backdrop-filter: blur(10px);
+    border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 10px 14px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+  }
+
+  /* Filter buttons */
+  .flt-btn {
+    padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    border: 1.5px solid #e2e8f0; cursor: pointer; transition: all .18s;
+    background: transparent; color: #64748b; font-family: 'Inter', sans-serif;
+    letter-spacing: .04em;
+  }
+  .flt-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+  .flt-btn.active-semua  { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .flt-btn.active-normal { background: #22c55e; color: #fff; border-color: #22c55e; }
+  .flt-btn.active-kritis { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+  .flt-btn.active-overflow{ background: #ef4444; color: #fff; border-color: #ef4444; }
+
+  /* Stat cards row */
+  .stat-cards { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; }
+  @media(max-width:900px){ .stat-cards { grid-template-columns: repeat(3,1fr); } }
+  @media(max-width:600px){ .stat-cards { grid-template-columns: repeat(2,1fr); } }
+  .stat-card {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.05); transition: box-shadow .2s, transform .2s;
+  }
+  .stat-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.1); transform: translateY(-2px); }
+  .stat-card .label { font-size: 9.5px; font-weight: 600; letter-spacing: .07em; color: #94a3b8; text-transform: uppercase; }
+  .stat-card .value { font-size: 22px; font-weight: 800; line-height: 1; margin: 2px 0; font-family: 'Roboto Slab', serif; }
+  .stat-card .sub   { font-size: 10px; color: #94a3b8; }
+
+  /* Side panel */
+  #side-panel {
+    position: absolute; z-index: 1001; top: 14px; right: 14px; width: 290px;
+    background: rgba(255,255,255,.97); backdrop-filter: blur(12px);
+    border: 1.5px solid #e2e8f0; border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.12);
+    overflow: hidden; transition: opacity .25s, transform .25s;
+    transform: translateX(10px); opacity: 0; pointer-events: none;
+  }
+  #side-panel.visible { transform: translateX(0); opacity: 1; pointer-events: all; }
+  #side-panel .sp-header { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: flex-start; }
+  #side-panel .sp-body   { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .metric-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
+  .metric-box .ml { font-size: 9px; font-weight: 600; letter-spacing: .07em; color: #94a3b8; text-transform: uppercase; }
+  .metric-box .mv { font-size: 16px; font-weight: 800; font-family: 'Roboto Slab', serif; color: #1e293b; }
+  .metric-box .mu { font-size: 9.5px; color: #94a3b8; }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px; font-size: 10px;
+    font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-family: 'Inter', sans-serif;
+  }
+  .badge-normal   { background: #dcfce7; color: #16a34a; }
+  .badge-kritis   { background: #fef3c7; color: #d97706; }
+  .badge-overflow { background: #fee2e2; color: #dc2626; }
+
+  /* District list */
+  #district-list { max-height: 220px; overflow-y: auto; }
+  #district-list::-webkit-scrollbar { width: 4px; }
+  #district-list::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
+  .dl-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 14px; border-bottom: 1px solid #f8fafc; cursor: pointer;
+    transition: background .15s; font-family: 'Inter', sans-serif;
+  }
+  .dl-item:hover { background: #f8fafc; }
+  .dl-item:last-child { border-bottom: none; }
+  .dl-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot-normal   { background: #22c55e; }
+  .dot-kritis   { background: #f59e0b; }
+  .dot-overflow { background: #ef4444; }
+
+  /* Hover tooltip override */
+  .lf-tooltip {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 8px 12px; font-family: 'Inter', sans-serif; font-size: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="gis-root">
+
+  <!-- ── Stat Cards ── -->
+  <div class="stat-cards">
+    <div class="stat-card" style="border-top: 3px solid #3b82f6;">
+      <span class="label">Total Kecamatan</span>
+      <span class="value" style="color:#1e40af;">{{ total_districts }}</span>
+      <span class="sub">wilayah Bandung</span>
+    </div>
+    <div class="stat-card" style="border-top: 3px solid #22c55e;">
+      <span class="label">Normal</span>
+      <span class="value" style="color:#16a34a;">{{ normal_count }}</span>
+      <span class="sub">&lt; 9 ton/hari</span>
+    </div>
+    <div class="stat-card" style="border-top: 3px solid #f59e0b;">
+      <span class="label">Kritis</span>
+      <span class="value" style="color:#d97706;">{{ kritis_count }}</span>
+      <span class="sub">9 – 15 ton/hari</span>
+    </div>
+    <div class="stat-card" style="border-top: 3px solid #ef4444;">
+      <span class="label">Overflow</span>
+      <span class="value" style="color:#dc2626;">{{ overflow_count }}</span>
+      <span class="sub">&gt; 15 ton/hari</span>
+    </div>
+    <div class="stat-card" style="border-top: 3px solid #8b5cf6;">
+      <span class="label">Total Prediksi</span>
+      <span class="value" style="color:#7c3aed;">{{ total_volume }}</span>
+      <span class="sub">ton/hari kota</span>
+    </div>
+  </div>
+
+  <!-- ── Filter Toolbar ── -->
+  <div id="filter-toolbar">
+    <button class="flt-btn active-semua" id="btn-semua"    onclick="filterMap('semua')">● Semua (30)</button>
+    <button class="flt-btn"              id="btn-normal"   onclick="filterMap('normal')">Normal</button>
+    <button class="flt-btn"             id="btn-kritis"   onclick="filterMap('kritis')">Kritis</button>
+    <button class="flt-btn"             id="btn-overflow" onclick="filterMap('overflow')">Overflow</button>
+    <span style="margin-left:auto; font-size:11px; color:#94a3b8; font-family:'Inter',sans-serif;" id="filter-counter">Menampilkan 30 kecamatan</span>
+    <button onclick="resetView()" style="margin-left:6px; padding:5px 12px; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:11px; color:#64748b; cursor:pointer; font-family:'Inter',sans-serif; transition:background .15s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">⟳ Reset View</button>
+  </div>
+
+  <!-- ── Map Area ── -->
+  <div id="map-wrapper">
+
+    <!-- Live badge -->
+    <div class="map-badge">
+      <span class="dot"></span>
+      KOTA BANDUNG — 30 KECAMATAN LIVE
+    </div>
+
+    <!-- Leaflet map -->
+    <div id="map"></div>
+
+    <!-- District list panel (bottom-left overlay) -->
+    <div style="position:absolute; z-index:1001; bottom:14px; left:14px; width:220px;
+                background:rgba(255,255,255,.95); backdrop-filter:blur(10px);
+                border:1.5px solid #e2e8f0; border-radius:12px;
+                box-shadow:0 4px 16px rgba(0,0,0,.1); overflow:hidden;">
+      <div style="padding:9px 12px; font-size:10px; font-weight:700; letter-spacing:.06em; color:#64748b; border-bottom:1px solid #f1f5f9; font-family:'Inter',sans-serif; background:#fafbfc; display:flex; justify-content:space-between; align-items:center;">
+        DAFTAR KECAMATAN
+        <span style="font-size:9px; font-weight:400; color:#94a3b8;" id="dl-title">30 wilayah</span>
+      </div>
+      <div id="district-list">
+        {% for z in zones | sort(attribute='nama') %}
+        <div class="dl-item" onclick="highlightDistrict('{{ z.id }}')" title="Klik untuk highlight">
+          <div style="display:flex; flex-direction:column;">
+            <span style="font-size:11px; font-weight:600; color:#1e293b;">{{ z.nama }}</span>
+            <span style="font-size:9.5px; color:#94a3b8;">{{ z.volume_prediksi }} ton/hari</span>
+          </div>
+          <span class="dl-dot dot-{{ z.status }}"></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Detail Side Panel (slides in on polygon click) -->
+    <div id="side-panel">
+      <div class="sp-header">
+        <div>
+          <div id="sp-id" style="font-size:9.5px; color:#94a3b8; font-family:'Inter',sans-serif; letter-spacing:.05em;"></div>
+          <div id="sp-name" style="font-size:15px; font-weight:800; color:#1e293b; font-family:'Roboto Slab',serif; margin:2px 0 4px;"></div>
+          <span id="sp-badge" class="status-badge badge-normal">Normal</span>
+        </div>
+        <button onclick="closePanel()" style="width:26px; height:26px; border-radius:50%; border:1px solid #e2e8f0; background:#f8fafc; color:#64748b; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">✕</button>
+      </div>
+      <div class="sp-body">
+        <!-- Row 1 -->
+        <div class="metric-row">
+          <div class="metric-box">
+            <span class="ml">Populasi</span>
+            <span class="mv" id="sp-pop" style="color:#1e40af; font-size:13px;">—</span>
+            <span class="mu">jiwa</span>
+          </div>
+          <div class="metric-box">
+            <span class="ml">Luas Wilayah</span>
+            <span class="mv" id="sp-luas" style="color:#1e40af; font-size:13px;">—</span>
+            <span class="mu">km²</span>
+          </div>
+        </div>
+        <!-- Row 2 -->
+        <div class="metric-row">
+          <div class="metric-box" style="border-top:2px solid #22c55e;">
+            <span class="ml">Vol. Aktual</span>
+            <span class="mv" id="sp-aktual" style="color:#16a34a;">—</span>
+            <span class="mu">ton/hari</span>
+          </div>
+          <div class="metric-box" style="border-top:2px solid #8b5cf6;">
+            <span class="ml">Prediksi AI</span>
+            <span class="mv" id="sp-prediksi" style="color:#7c3aed;">—</span>
+            <span class="mu">ton/hari</span>
+          </div>
+        </div>
+        <!-- Row 3 -->
+        <div class="metric-row">
+          <div class="metric-box">
+            <span class="ml">Horeca Index</span>
+            <span class="mv" id="sp-horeca" style="font-size:13px; color:#0f172a;">—</span>
+          </div>
+          <div class="metric-box">
+            <span class="ml">IoT Fill Level</span>
+            <span class="mv" id="sp-iot" style="font-size:13px; color:#0f172a;">—</span>
+          </div>
+        </div>
+        <!-- Difference bar -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; font-family:'Inter',sans-serif; font-size:11px;">
+          <span style="color:#64748b;">Selisih Vol.</span>
+          <span id="sp-selisih" style="font-weight:700;">—</span>
+        </div>
+        <!-- CTA button -->
+        <a id="sp-cta" href="#" style="display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; border-radius:10px; background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff; font-size:11.5px; font-weight:700; text-decoration:none; font-family:'Inter',sans-serif; transition:opacity .2s; box-shadow:0 3px 10px rgba(99,102,241,.3);" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          🧠 Buka Halaman Prediksi
+        </a>
+      </div>
+    </div>
+
+  </div><!-- end map-wrapper -->
+</div><!-- end gis-root -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── State ──────────────────────────────────────────────────────
+let map, geojsonLayer, rawData;
+let currentFilter = 'semua';
+const API_URL = "{{ url_for('gis.get_geojson_data') }}";
+const PREDICT_URL = "{{ url_for('prediction.index') }}";
+
+// Colour palette (light map friendly)
+const COLORS = {
+  normal:   { fill: '#22c55e', stroke: '#16a34a' },
+  kritis:   { fill: '#f59e0b', stroke: '#d97706' },
+  overflow: { fill: '#ef4444', stroke: '#dc2626' },
+};
+const DEFAULT_STYLE = { normal: { fill: '#22c55e' }, kritis: { fill: '#f59e0b' }, overflow: { fill: '#ef4444' } };
+
+// ── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Center on Bandung City
+  map = L.map('map', { zoomControl: false, minZoom: 11, maxZoom: 17 })
+         .setView([-6.9175, 107.6191], 12);
+
+  // Add zoom control on right side
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  // ── Light Realistic Tile Layer: CartoDB Positron ──
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20,
+    tileSize: 256,
+  }).addTo(map);
+
+  addLegend();
+
+  // Load enriched GeoJSON
+  fetch(API_URL)
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(data => {
+      rawData = data;
+      renderLayer(data);
+      // Fit map to Bandung bounds once data loads
+      if (geojsonLayer) map.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
+    })
+    .catch(err => {
+      console.error('GeoJSON load error:', err);
+      showMapError('Gagal memuat data peta. Cek koneksi server.');
+    });
+});
+
+// ── Polygon Styling ────────────────────────────────────────────
+function styleFeature(feature) {
+  const status = feature.properties.status || 'normal';
+  const c = COLORS[status];
+  return {
+    fillColor:   c.fill,
+    fillOpacity: 0.38,
+    color:       c.stroke,
+    weight:      1.4,
+    opacity:     0.9,
+  };
+}
+
+function hoverStyle(feature) {
+  const status = feature.properties.status || 'normal';
+  const c = COLORS[status];
+  return { fillOpacity: 0.62, weight: 2.5, color: '#1e293b' };
+}
+
+// ── Render Layer ───────────────────────────────────────────────
+function renderLayer(geojson) {
+  if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+  const features = currentFilter === 'semua'
+    ? geojson.features
+    : geojson.features.filter(f => f.properties.status === currentFilter);
+
+  const label = currentFilter === 'semua' ? 'kecamatan' : `kecamatan berstatus ${currentFilter.toUpperCase()}`;
+  document.getElementById('filter-counter').textContent = `Menampilkan ${features.length} ${label}`;
+  document.getElementById('dl-title').textContent = `${features.length} wilayah`;
+
+  geojsonLayer = L.geoJSON({ type:'FeatureCollection', features }, {
+    style: styleFeature,
+    onEachFeature(feature, layer) {
+      const p = feature.properties;
+
+      // ── Tooltip on hover
+      layer.bindTooltip(buildTooltip(p), { className: 'lf-tooltip', sticky: true, direction: 'top', offset: [0, -8] });
+
+      layer.on({
+        mouseover(e) {
+          e.target.setStyle({ fillOpacity: 0.62, weight: 2.5, color: '#1e293b' });
+          e.target.bringToFront();
+        },
+        mouseout(e) {
+          geojsonLayer.resetStyle(e.target);
+        },
+        click(e) {
+          openPanel(p);
+          map.fitBounds(e.target.getBounds(), { padding: [50, 50], maxZoom: 14 });
+        }
+      });
+    }
+  }).addTo(map);
+}
+
+// ── Tooltip HTML ───────────────────────────────────────────────
+function buildTooltip(p) {
+  const statusClr = p.status === 'overflow' ? '#dc2626' : p.status === 'kritis' ? '#d97706' : '#16a34a';
+  const statusLbl = p.status === 'overflow' ? '🔴 Overflow' : p.status === 'kritis' ? '🟡 Kritis' : '🟢 Normal';
+  return `<div style="font-family:'Inter',sans-serif; min-width:140px;">
+    <div style="font-weight:800; font-size:13px; color:#1e293b; margin-bottom:4px;">${p.nama || p.nama_kecamatan}</div>
+    <div style="font-size:11px; color:#64748b; display:flex; justify-content:space-between; margin-bottom:2px;">
+      <span>Prediksi AI</span><strong style="color:#7c3aed;">${p.volume_prediksi} ton/hari</strong>
+    </div>
+    <div style="font-size:11px; color:#64748b; display:flex; justify-content:space-between;">
+      <span>Status</span><strong style="color:${statusClr};">${statusLbl}</strong>
+    </div>
+  </div>`;
+}
+
+// ── Filter ─────────────────────────────────────────────────────
+function filterMap(val) {
+  currentFilter = val;
+  // Reset all button styles
+  ['semua','normal','kritis','overflow'].forEach(k => {
+    const btn = document.getElementById('btn-' + k);
+    btn.className = `flt-btn${val === k ? ' active-' + k : ''}`;
+  });
+  if (rawData) renderLayer(rawData);
+}
+
+// ── Side Panel ─────────────────────────────────────────────────
+function openPanel(p) {
+  const panel = document.getElementById('side-panel');
+
+  document.getElementById('sp-id').textContent    = p.id_kecamatan || p.district_db_id || '';
+  document.getElementById('sp-name').textContent  = p.nama || p.nama_kecamatan || '—';
+  document.getElementById('sp-pop').textContent   = (p.populasi || 0).toLocaleString('id-ID');
+  document.getElementById('sp-luas').textContent  = p.luas_wilayah || '—';
+  document.getElementById('sp-aktual').textContent   = p.volume_harian   + ' t';
+  document.getElementById('sp-prediksi').textContent = p.volume_prediksi + ' t';
+  document.getElementById('sp-horeca').textContent   = (p.horeca_index || 0).toFixed(2);
+  document.getElementById('sp-iot').textContent      = (p.iot_fill_level || 0).toFixed(1) + '%';
+
+  const diff = p.difference || 0;
+  const sel  = document.getElementById('sp-selisih');
+  sel.textContent = (diff >= 0 ? '+' : '') + diff + ' ton';
+  sel.style.color = diff > 0 ? '#d97706' : '#16a34a';
+
+  const badge = document.getElementById('sp-badge');
+  badge.textContent = (p.status || 'normal').toUpperCase();
+  badge.className   = 'status-badge badge-' + (p.status || 'normal');
+
+  document.getElementById('sp-cta').href = PREDICT_URL + '?district_id=' + (p.id_kecamatan || p.district_db_id || '');
+
+  panel.classList.add('visible');
+}
+
+function closePanel() {
+  document.getElementById('side-panel').classList.remove('visible');
+}
+
+// ── Highlight from district list ───────────────────────────────
+function highlightDistrict(districtId) {
+  if (!geojsonLayer) return;
+  geojsonLayer.eachLayer(layer => {
+    const p = layer.feature.properties;
+    const lid = p.id_kecamatan || p.district_db_id;
+    if (lid === districtId) {
+      map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 14 });
+      layer.setStyle({ fillOpacity: 0.72, weight: 3, color: '#1e293b' });
+      setTimeout(() => geojsonLayer.resetStyle(layer), 1200);
+      openPanel(p);
+    }
+  });
+}
+
+// ── Reset map view ─────────────────────────────────────────────
+function resetView() {
+  map.setView([-6.9175, 107.6191], 12);
+  closePanel();
+  filterMap('semua');
+}
+
+// ── Legend ─────────────────────────────────────────────────────
+function addLegend() {
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = () => {
+    const div = L.DomUtil.create('div', 'gis-legend');
+    div.innerHTML = `
+      <div style="font-size:10px; font-weight:700; letter-spacing:.06em; color:#475569; margin-bottom:8px; text-transform:uppercase;">Legenda Status</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#475569;">
+          <span style="width:14px;height:14px;background:#22c55e;border-radius:3px;display:inline-block;"></span>Normal &lt; 9 ton
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#475569;">
+          <span style="width:14px;height:14px;background:#f59e0b;border-radius:3px;display:inline-block;"></span>Kritis 9–15 ton
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#475569;">
+          <span style="width:14px;height:14px;background:#ef4444;border-radius:3px;display:inline-block;"></span>Overflow &gt; 15 ton
+        </div>
+      </div>
+    `;
+    return div;
+  };
+  legend.addTo(map);
+}
+
+// ── Map error overlay ──────────────────────────────────────────
+function showMapError(msg) {
+  const wrapper = document.getElementById('map-wrapper');
+  const err = document.createElement('div');
+  err.style.cssText = 'position:absolute;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.9);font-family:Inter,sans-serif;color:#ef4444;font-weight:700;font-size:14px;';
+  err.textContent = '⚠️ ' + msg;
+  wrapper.appendChild(err);
+}
+</script>
+{% endblock %}

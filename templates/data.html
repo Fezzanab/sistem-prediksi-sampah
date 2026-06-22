@@ -1,0 +1,520 @@
+{% extends 'base.html' %}
+
+{% block title %}Data Management{% endblock %}
+
+{% block page_title %}Manajemen Data Sampah{% endblock %}
+{% block page_subtitle %}Kelola data kecamatan, Horeca, populasi, dan sensor IoT{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    <!-- Tab navigation -->
+    <div class="flex items-center justify-between border-b border-slate-900/60 pb-1 flex-wrap gap-4">
+        <div class="flex gap-2">
+            <a href="{{ url_for('data.index', tab='districts') }}" 
+               class="px-4 py-2 text-xs font-mono rounded-lg border tracking-wider uppercase transition-colors {% if active_tab == 'districts' %}bg-emerald-500/10 text-emerald-400 border-emerald-500/30{% else %}border-slate-800 text-slate-400 hover:border-slate-700/50 hover:text-slate-200{% endif %}">
+                Wilayah &amp; Demografi
+            </a>
+            <a href="{{ url_for('data.index', tab='horeca') }}" 
+               class="px-4 py-2 text-xs font-mono rounded-lg border tracking-wider uppercase transition-colors {% if active_tab == 'horeca' %}bg-emerald-500/10 text-emerald-400 border-emerald-500/30{% else %}border-slate-800 text-slate-400 hover:border-slate-700/50 hover:text-slate-200{% endif %}">
+                Horeca
+            </a>
+            <a href="{{ url_for('data.index', tab='iot') }}" 
+               class="px-4 py-2 text-xs font-mono rounded-lg border tracking-wider uppercase transition-colors {% if active_tab == 'iot' %}bg-emerald-500/10 text-emerald-400 border-emerald-500/30{% else %}border-slate-800 text-slate-400 hover:border-slate-700/50 hover:text-slate-200{% endif %}">
+                Sensor IoT
+            </a>
+        </div>
+        
+        <!-- Add Data Button & Search -->
+        <div class="flex items-center gap-3 flex-1 sm:flex-none justify-end">
+            <!-- Search bar -->
+            <div class="flex items-center gap-2 bg-slate-950/40 border border-slate-900/80 rounded-lg px-3 py-1.5 w-full max-w-[240px] glass-input">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-500"></i>
+                <input 
+                    id="table-search" 
+                    type="text" 
+                    placeholder="Cari..." 
+                    class="bg-transparent text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none w-full"
+                >
+            </div>
+            
+            <button 
+                onclick="openAddModal()" 
+                class="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-emerald-950/20 active:translate-y-0.5"
+            >
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                Tambah Data
+            </button>
+        </div>
+    </div>
+
+    <!-- ─── TAB 1: DISTRICTS ─── -->
+    {% if active_tab == 'districts' %}
+    <div class="glass-panel rounded-xl overflow-hidden shadow-lg border border-slate-900/60">
+        <div class="px-5 py-4 border-b border-slate-900/60 flex items-center justify-between">
+            <h3 class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-widest">Daftar Wilayah ({{ districts|length }} entri)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left" id="data-table">
+                <thead>
+                    <tr class="border-b border-slate-900/40 text-slate-400 font-mono uppercase text-[10px]">
+                        <th class="px-5 py-3">ID</th>
+                        <th class="px-5 py-3">Nama Wilayah</th>
+                        <th class="px-5 py-3">Kecamatan</th>
+                        <th class="px-5 py-3">Populasi</th>
+                        <th class="px-5 py-3">Luas Wilayah</th>
+                        <th class="px-5 py-3">Kepadatan</th>
+                        <th class="px-5 py-3">Pendapatan</th>
+                        <th class="px-5 py-3">Wisatawan</th>
+                        <th class="px-5 py-3 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-900/20">
+                    {% for d in districts %}
+                    <tr class="hover:bg-slate-900/30 transition-colors searchable-row">
+                        <td class="px-5 py-3 font-mono text-slate-400">{{ d.id }}</td>
+                        <td class="px-5 py-3 font-bold text-slate-200 search-key">{{ d.nama }}</td>
+                        <td class="px-5 py-3 text-slate-300 search-key">{{ d.kecamatan }}</td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ "{:,}".format(d.populasi)|replace(",", ".") }} jiwa</td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ d.luas_wilayah }} km²</td>
+                        <td class="px-5 py-3 font-mono text-slate-400">{{ "{:,}".format(d.kepadatan_penduduk)|replace(",", ".") }} jiwa/km²</td>
+                        <td class="px-5 py-3 font-mono text-slate-300">Rp {{ "{:,}".format(d.pendapatan|int)|replace(",", ".") }}</td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ "{:,}".format(d.wisatawan)|replace(",", ".") }} /bln</td>
+                        <td class="px-5 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button 
+                                    onclick='openEditDistrictModal({{ d.to_dict()|tojson }})'
+                                    class="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-emerald-400 transition-colors"
+                                    title="Edit Wilayah"
+                                >
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <form action="{{ url_for('data.delete_district', id=d.id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus wilayah {{ d.nama }}? Semua Horeca dan Sensor terkait akan ikut terhapus.')">
+                                    <button type="submit" class="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors" title="Hapus Wilayah">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not districts %}
+                    <tr>
+                        <td colSpan="9" class="px-5 py-10 text-center font-mono text-slate-500">Belum ada data wilayah. Silakan tambah data baru.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ─── TAB 2: HORECA ─── -->
+    {% if active_tab == 'horeca' %}
+    <div class="glass-panel rounded-xl overflow-hidden shadow-lg border border-slate-900/60">
+        <div class="px-5 py-4 border-b border-slate-900/60 flex items-center justify-between">
+            <h3 class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-widest">Daftar Bisnis Horeca ({{ horeca_list|length }} entri)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left" id="data-table">
+                <thead>
+                    <tr class="border-b border-slate-900/40 text-slate-400 font-mono uppercase text-[10px]">
+                        <th class="px-5 py-3">ID</th>
+                        <th class="px-5 py-3">Nama Usaha</th>
+                        <th class="px-5 py-3">Kecamatan</th>
+                        <th class="px-5 py-3">Jenis</th>
+                        <th class="px-5 py-3">Waste Index</th>
+                        <th class="px-5 py-3">Terakhir Diperbarui</th>
+                        <th class="px-5 py-3 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-900/20">
+                    {% for h in horeca_list %}
+                    <tr class="hover:bg-slate-900/30 transition-colors searchable-row">
+                        <td class="px-5 py-3 font-mono text-slate-400">HOR-{{ h.id }}</td>
+                        <td class="px-5 py-3 font-bold text-slate-200 search-key">{{ h.nama_usaha }}</td>
+                        <td class="px-5 py-3 text-slate-300 search-key">{{ h.district.nama if h.district else 'Tidak Diketahui' }}</td>
+                        <td class="px-5 py-3">
+                            <span class="px-2 py-0.5 bg-slate-900/60 border border-slate-800 rounded font-mono text-[10px] capitalize">{{ h.jenis }}</span>
+                        </td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ h.waste_index }} <span class="text-slate-500 text-[10px]">t/hari</span></td>
+                        <td class="px-5 py-3 font-mono text-slate-400">{{ h.updated_at.strftime('%Y-%m-%d %H:%M') if h.updated_at else '-' }}</td>
+                        <td class="px-5 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button 
+                                    onclick='openEditHorecaModal({{ h.to_dict()|tojson }})'
+                                    class="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-emerald-400 transition-colors"
+                                    title="Edit Horeca"
+                                >
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <form action="{{ url_for('data.delete_horeca', id=h.id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus data Horeca {{ h.nama_usaha }}?')">
+                                    <button type="submit" class="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors" title="Hapus Horeca">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not horeca_list %}
+                    <tr>
+                        <td colSpan="7" class="px-5 py-10 text-center font-mono text-slate-500">Belum ada data Horeca. Silakan tambah data baru.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ─── TAB 3: IOT DEVICES ─── -->
+    {% if active_tab == 'iot' %}
+    <div class="glass-panel rounded-xl overflow-hidden shadow-lg border border-slate-900/60">
+        <div class="px-5 py-4 border-b border-slate-900/60 flex items-center justify-between">
+            <h3 class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-widest">Daftar Node Sensor IoT ({{ iot_devices|length }} entri)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left" id="data-table">
+                <thead>
+                    <tr class="border-b border-slate-900/40 text-slate-400 font-mono uppercase text-[10px]">
+                        <th class="px-5 py-3">Kode Device</th>
+                        <th class="px-5 py-3">Wilayah Instalan</th>
+                        <th class="px-5 py-3">Level Pengisian</th>
+                        <th class="px-5 py-3">Volume Sampah</th>
+                        <th class="px-5 py-3">Status Baterai</th>
+                        <th class="px-5 py-3">Log Terakhir</th>
+                        <th class="px-5 py-3 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-900/20">
+                    {% for iot in iot_devices %}
+                    <tr class="hover:bg-slate-900/30 transition-colors searchable-row">
+                        <td class="px-5 py-3 font-mono font-bold text-slate-200 search-key">{{ iot.device_code }}</td>
+                        <td class="px-5 py-3 text-slate-300 search-key">{{ iot.district.nama if iot.district else 'Tidak Terhubung' }}</td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center gap-2 max-w-[120px]">
+                                <div class="w-full bg-slate-900/80 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                                    <div class="h-1.5 rounded-full {% if iot.fill_level >= 80 %}bg-red-500{% elif iot.fill_level >= 50 %}bg-amber-500{% else %}bg-emerald-500{% endif %}" style="width: {{ iot.fill_level }}%;"></div>
+                                </div>
+                                <span class="font-mono text-[10px] text-slate-300">{{ iot.fill_level|int }}%</span>
+                            </div>
+                        </td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ iot.volume_m3 }} <span class="text-slate-500 text-[10px]">m³</span></td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center gap-1.5">
+                                <i data-lucide="battery" class="w-3.5 h-3.5 {% if iot.battery_level < 20 %}text-red-500 animate-pulse{% else %}text-emerald-400{% endif %}"></i>
+                                <span class="font-mono text-[10px] text-slate-300">{{ iot.battery_level|int }}%</span>
+                            </div>
+                        </td>
+                        <td class="px-5 py-3 font-mono text-slate-400">{{ iot.last_update.strftime('%Y-%m-%d %H:%M') if iot.last_update else '-' }}</td>
+                        <td class="px-5 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button 
+                                    onclick='openEditIotModal({{ iot.to_dict()|tojson }})'
+                                    class="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-emerald-400 transition-colors"
+                                    title="Edit Sensor"
+                                >
+                                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <form action="{{ url_for('data.delete_iot', id=iot.id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus data Sensor IoT {{ iot.device_code }}?')">
+                                    <button type="submit" class="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors" title="Hapus Sensor">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not iot_devices %}
+                    <tr>
+                        <td colSpan="7" class="px-5 py-10 text-center font-mono text-slate-500">Belum ada data sensor IoT. Silakan tambah data baru.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- ─── OVERLAY MODALS (Glassmorphic Forms) ─── -->
+
+<!-- 1. ADD / EDIT DISTRICT MODAL -->
+<div id="district-modal" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden glass-panel">
+        <div class="px-6 py-4 border-b border-slate-900/60 flex items-center justify-between">
+            <h3 id="district-modal-title" class="text-sm font-bold text-slate-200" style="font-family: 'Roboto Slab', serif;">Tambah Wilayah Baru</h3>
+            <button onclick="closeModal('district-modal')" class="text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <form id="district-form" action="{{ url_for('data.add_district') }}" method="POST" class="p-6 space-y-4">
+            
+            <div class="grid grid-cols-3 gap-4">
+                <div class="col-span-1">
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">ID Zona</label>
+                    <input type="text" id="d_id" name="id" required placeholder="Z09" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Nama Wilayah</label>
+                    <input type="text" id="d_nama" name="nama" required placeholder="Zona Senayan" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Kecamatan</label>
+                <input type="text" id="d_kecamatan" name="kecamatan" required placeholder="Kec. Tanah Abang" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Populasi (Jiwa)</label>
+                    <input type="number" id="d_populasi" name="populasi" required placeholder="32000" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Luas Wilayah (km²)</label>
+                    <input type="number" step="0.01" id="d_luas" name="luas_wilayah" required placeholder="8.45" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Pendapatan Rerata (Rp)</label>
+                    <input type="number" id="d_pendapatan" name="pendapatan" required placeholder="8500000" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Turis (Per Bulan)</label>
+                    <input type="number" id="d_wisatawan" name="wisatawan" required placeholder="2400" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-900/40">
+                <button type="button" onclick="closeModal('district-modal')" class="px-4 py-2 border border-slate-800 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    Batal
+                </button>
+                <button type="submit" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-xs font-semibold shadow-lg">
+                    Simpan Data
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. ADD / EDIT HORECA MODAL -->
+<div id="horeca-modal" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden glass-panel">
+        <div class="px-6 py-4 border-b border-slate-900/60 flex items-center justify-between">
+            <h3 id="horeca-modal-title" class="text-sm font-bold text-slate-200" style="font-family: 'Roboto Slab', serif;">Tambah Data Horeca</h3>
+            <button onclick="closeModal('horeca-modal')" class="text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <form id="horeca-form" action="{{ url_for('data.add_horeca') }}" method="POST" class="p-6 space-y-4">
+            
+            <div>
+                <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Wilayah Instalan</label>
+                <select id="h_district" name="district_id" required class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+                    <option value="">-- Pilih Wilayah --</option>
+                    {% for d in districts %}
+                    <option value="{{ d.id }}">{{ d.id }} — {{ d.nama }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Nama Usaha</label>
+                <input type="text" id="h_nama" name="nama_usaha" required placeholder="Hotel Mulia" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Jenis</label>
+                    <select id="h_jenis" name="jenis" required class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+                        <option value="hotel">Hotel</option>
+                        <option value="restaurant">Restoran</option>
+                        <option value="cafe">Kafe</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Waste Index (t/hari)</label>
+                    <input type="number" step="0.01" id="h_waste" name="waste_index" required placeholder="0.75" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-900/40">
+                <button type="button" onclick="closeModal('horeca-modal')" class="px-4 py-2 border border-slate-800 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    Batal
+                </button>
+                <button type="submit" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-xs font-semibold shadow-lg">
+                    Simpan Data
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. ADD / EDIT IOT MODAL -->
+<div id="iot-modal" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden glass-panel">
+        <div class="px-6 py-4 border-b border-slate-900/60 flex items-center justify-between">
+            <h3 id="iot-modal-title" class="text-sm font-bold text-slate-200" style="font-family: 'Roboto Slab', serif;">Tambah Sensor IoT</h3>
+            <button onclick="closeModal('iot-modal')" class="text-slate-400 hover:text-slate-200">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <form id="iot-form" action="{{ url_for('data.add_iot') }}" method="POST" class="p-6 space-y-4">
+            
+            <div>
+                <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Wilayah Instalan</label>
+                <select id="i_district" name="district_id" required class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80">
+                    <option value="">-- Pilih Wilayah --</option>
+                    {% for d in districts %}
+                    <option value="{{ d.id }}">{{ d.id }} — {{ d.nama }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Kode Sensor / Perangkat</label>
+                <input type="text" id="i_code" name="device_code" required placeholder="IOT-GB-01" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Isi (%)</label>
+                    <input type="number" min="0" max="100" id="i_fill" name="fill_level" required placeholder="45" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Vol (m³)</label>
+                    <input type="number" step="0.01" id="i_vol" name="volume_m3" required placeholder="0.8" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">Baterai (%)</label>
+                    <input type="number" min="0" max="100" id="i_batt" name="battery_level" required placeholder="95" class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-900/40">
+                <button type="button" onclick="closeModal('iot-modal')" class="px-4 py-2 border border-slate-800 rounded-lg text-xs font-mono text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    Batal
+                </button>
+                <button type="submit" class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-xs font-semibold shadow-lg">
+                    Simpan Data
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const activeTab = "{{ active_tab }}";
+
+    // ─── Modal Openers and Closers ───
+    function closeModal(id) {
+        document.getElementById(id).classList.add("hidden");
+    }
+
+    function openAddModal() {
+        if (activeTab === "districts") {
+            // Reset form
+            document.getElementById("district-form").reset();
+            document.getElementById("d_id").readOnly = false;
+            document.getElementById("d_id").classList.remove("opacity-60");
+            document.getElementById("district-modal-title").innerText = "Tambah Wilayah Baru";
+            document.getElementById("district-form").action = "{{ url_for('data.add_district') }}";
+            document.getElementById("district-modal").classList.remove("hidden");
+        } else if (activeTab === "horeca") {
+            document.getElementById("horeca-form").reset();
+            document.getElementById("horeca-modal-title").innerText = "Tambah Data Horeca";
+            document.getElementById("horeca-form").action = "{{ url_for('data.add_horeca') }}";
+            document.getElementById("horeca-modal").classList.remove("hidden");
+        } else if (activeTab === "iot") {
+            document.getElementById("iot-form").reset();
+            document.getElementById("iot-modal-title").innerText = "Tambah Sensor IoT";
+            document.getElementById("iot-form").action = "{{ url_for('data.add_iot') }}";
+            document.getElementById("iot-modal").classList.remove("hidden");
+        }
+    }
+
+    function openEditDistrictModal(data) {
+        document.getElementById("district-modal-title").innerText = "Edit Wilayah: " + data.nama;
+        document.getElementById("d_id").value = data.id;
+        document.getElementById("d_id").readOnly = true;
+        document.getElementById("d_id").classList.add("opacity-60");
+        document.getElementById("d_nama").value = data.nama;
+        document.getElementById("d_kecamatan").value = data.kecamatan;
+        document.getElementById("d_populasi").value = data.populasi;
+        document.getElementById("d_luas").value = data.luas_wilayah;
+        document.getElementById("d_pendapatan").value = data.pendapatan;
+        document.getElementById("d_wisatawan").value = data.wisatawan;
+        
+        // Update form action
+        const actionUrl = "{{ url_for('data.edit_district', id='_ID_') }}".replace('_ID_', data.id);
+        document.getElementById("district-form").action = actionUrl;
+        
+        document.getElementById("district-modal").classList.remove("hidden");
+    }
+
+    function openEditHorecaModal(data) {
+        document.getElementById("horeca-modal-title").innerText = "Edit Horeca: " + data.nama_usaha;
+        document.getElementById("h_district").value = data.district_id;
+        document.getElementById("h_nama").value = data.nama_usaha;
+        document.getElementById("h_jenis").value = data.jenis;
+        document.getElementById("h_waste").value = data.waste_index;
+
+        const actionUrl = "{{ url_for('data.edit_horeca', id=999999) }}".replace(999999, data.id);
+        document.getElementById("horeca-form").action = actionUrl;
+
+        document.getElementById("horeca-modal").classList.remove("hidden");
+    }
+
+    function openEditIotModal(data) {
+        document.getElementById("iot-modal-title").innerText = "Edit Sensor: " + data.device_code;
+        document.getElementById("i_district").value = data.district_id;
+        document.getElementById("i_code").value = data.device_code;
+        document.getElementById("i_fill").value = data.fill_level;
+        document.getElementById("i_vol").value = data.volume_m3;
+        document.getElementById("i_batt").value = data.battery_level;
+
+        const actionUrl = "{{ url_for('data.edit_iot', id=999999) }}".replace(999999, data.id);
+        document.getElementById("iot-form").action = actionUrl;
+
+        document.getElementById("iot-modal").classList.remove("hidden");
+    }
+
+    // ─── Instant local table searching ───
+    const searchInput = document.getElementById("table-search");
+    if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const rows = document.querySelectorAll(".searchable-row");
+            
+            rows.forEach(row => {
+                const searchKeys = row.querySelectorAll(".search-key");
+                let match = false;
+                searchKeys.forEach(key => {
+                    if (key.textContent.toLowerCase().includes(query)) {
+                        match = true;
+                    }
+                });
+                
+                // Also search inside first cell (ID)
+                const firstCell = row.cells[0];
+                if (firstCell && firstCell.textContent.toLowerCase().includes(query)) {
+                    match = true;
+                }
+                
+                if (match || query === "") {
+                    row.classList.remove("hidden");
+                } else {
+                    row.classList.add("hidden");
+                }
+            });
+        });
+    }
+</script>
+{% endblock %}

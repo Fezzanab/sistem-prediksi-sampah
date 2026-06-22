@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Waste Prediction{% endblock %}
+
+{% block page_title %}Prediksi Timbulan Sampah Berbasis AI{% endblock %}
+{% block page_subtitle %}Model machine learning ensemble Random Forest regresi per kecamatan{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Side: Inputs & Model Info (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-5">
+            
+            <!-- Parameter Form -->
+            <div class="glass-panel rounded-xl p-5 border border-slate-900/60 shadow-lg">
+                <div class="flex items-center gap-2 mb-5">
+                    <i data-lucide="brain" class="w-4 h-4 text-emerald-400"></i>
+                    <h3 class="text-xs font-mono font-semibold text-slate-300 uppercase tracking-widest">Parameter Prediksi AI</h3>
+                </div>
+                
+                <form action="{{ url_for('prediction.run_prediction') }}" method="POST" class="space-y-4">
+                    
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Pilih Kecamatan</label>
+                        <select 
+                            id="district_select" 
+                            name="district_id" 
+                            required 
+                            onchange="loadDistrictFeatures(this)"
+                            class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80"
+                        >
+                            <option value="">-- Pilih Wilayah --</option>
+                            {% for d in districts %}
+                            <option value="{{ d.id }}">{{ d.id }} — {{ d.nama }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Populasi (Jiwa)</label>
+                            <input 
+                                type="number" 
+                                id="f_populasi" 
+                                name="populasi" 
+                                required 
+                                class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono"
+                            >
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Luas Wilayah (km²)</label>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                id="f_luas" 
+                                name="luas_wilayah" 
+                                required 
+                                class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Kepadatan (Jiwa/km²)</label>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                id="f_kepadatan" 
+                                name="kepadatan_penduduk" 
+                                required 
+                                readonly
+                                class="w-full bg-slate-950/30 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400 focus:outline-none font-mono opacity-60"
+                            >
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Wisatawan (Per Bulan)</label>
+                            <input 
+                                type="number" 
+                                id="f_wisatawan" 
+                                name="wisatawan" 
+                                required 
+                                class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Horeca Waste Index</label>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                id="f_horeca" 
+                                name="horeca" 
+                                required 
+                                class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono"
+                            >
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] font-mono text-slate-400 uppercase tracking-widest">IoT Fill Level Avg (%)</label>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                id="f_iot" 
+                                name="iot" 
+                                required 
+                                class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Pendapatan Rerata (Rp)</label>
+                        <input 
+                            type="number" 
+                            id="f_pendapatan" 
+                            name="pendapatan" 
+                            required 
+                            class="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/80 font-mono"
+                        >
+                    </div>
+
+                    <div class="pt-2">
+                        <button 
+                            type="submit" 
+                            class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-1.5 active:translate-y-0.5"
+                        >
+                            <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                            Jalankan Prediksi AI
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Model Registry Info & Train Trigger -->
+            <div class="glass-panel rounded-xl p-5 border border-slate-900/60 shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-widest">Status Model Aktif</h3>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">REGISTERED</span>
+                </div>
+                
+                <div class="flex flex-col gap-2.5 text-xs border-b border-slate-900/60 pb-4 mb-4">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 font-mono">Versi Terdaftar:</span>
+                        <span class="font-bold text-slate-200 font-mono">{{ active_model.version if active_model else 'RF-Default-v1.0' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 font-mono">Akurasi Model (MAPE):</span>
+                        <span class="font-bold text-slate-200 font-mono">{{ active_model.accuracy if active_model else '96.8' }}%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 font-mono">Nilai R-Squared (R²):</span>
+                        <span class="font-bold text-slate-200 font-mono">{{ active_model.r2_score if active_model else '0.942' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500 font-mono">Tanggal Latih:</span>
+                        <span class="font-mono text-slate-400">{{ active_model.trained_at.strftime('%Y-%m-%d %H:%M') if active_model else '2026-06-01 00:00' }}</span>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('prediction.train_model') }}" method="POST">
+                    <button 
+                        type="submit" 
+                        class="w-full py-2 bg-slate-950/60 border border-slate-800 hover:bg-slate-900 text-slate-300 hover:text-slate-100 rounded-lg text-xs font-mono flex items-center justify-center gap-1.5 transition-colors active:translate-y-0.5"
+                    >
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        Latih Ulang Model AI
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- Right Side: Results (7 cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-5 h-full">
+            
+            {% if prediction_result %}
+            <!-- Prediction Results Card -->
+            <div class="glass-panel rounded-xl p-5 border border-emerald-500/25 shadow-lg flex-1">
+                <div class="flex items-center justify-between mb-5">
+                    <h3 class="text-sm font-bold text-slate-200" style="font-family: 'Roboto Slab', serif;">Hasil Estimasi AI: {{ prediction_result.district_name }}</h3>
+                    <div class="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <span class="text-[10px] font-mono text-emerald-400 font-bold uppercase">BERHASIL</span>
+                    </div>
+                </div>
+
+                <!-- Simulation Mode Warning -->
+                {% if prediction_result.is_mock %}
+                <div class="mb-4 flex items-start gap-2.5 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-lg text-[11px] leading-relaxed">
+                    <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                    <span><strong>Simulasi Mode:</strong> Layanan FastAPI tidak terdeteksi. Hasil ini dihitung menggunakan formula ensemble Random Forest lokal.</span>
+                </div>
+                {% endif %}
+
+                <!-- Big Number -->
+                <div class="text-center py-7 bg-slate-950/40 border border-slate-900/60 rounded-xl mb-5 shadow-inner">
+                    <div class="text-5xl font-extrabold text-emerald-400 tracking-tight" style="font-family: 'Roboto Slab', serif;">{{ prediction_result.prediction }}</div>
+                    <div class="text-xs text-slate-400 mt-1 font-mono uppercase tracking-widest">Ton Sampah Plastik / Hari</div>
+                    <div class="mt-4 text-[10px] font-mono text-slate-500">
+                        Confidence Score: <span class="text-slate-300">{{ prediction_result.confidence }}%</span> &bull; Model: {{ prediction_result.model_version }}
+                    </div>
+                </div>
+
+                <!-- Telemetry Comparison -->
+                <div class="grid grid-cols-2 gap-4 mb-5">
+                    <div class="bg-slate-950/30 border border-slate-900/60 rounded-xl p-4 flex flex-col items-center justify-center">
+                        <span class="text-[10px] font-mono text-slate-500 uppercase tracking-wider text-center">Truk Dibutuhkan</span>
+                        <span class="text-2xl font-extrabold text-slate-200 mt-1" style="font-family: 'Roboto Slab', serif;">{{ prediction_result.armada_needed }}</span>
+                        <span class="text-[10px] text-slate-400 mt-0.5">unit armada (kap. 3.5t)</span>
+                    </div>
+                    <div class="bg-slate-950/30 border border-slate-900/60 rounded-xl p-4 flex flex-col items-center justify-center">
+                        <span class="text-[10px] font-mono text-slate-500 uppercase tracking-wider text-center">Deviasi vs Kemarin</span>
+                        <span class="text-2xl font-extrabold mt-1 {% if prediction_result.difference > 0 %}text-amber-400{% else %}text-emerald-400{% endif %}" style="font-family: 'Roboto Slab', serif;">
+                            {% if prediction_result.difference > 0 %}+{% endif %}{{ prediction_result.difference }}
+                        </span>
+                        <span class="text-[10px] text-slate-400 mt-0.5">ton ({% if prediction_result.difference > 0 %}Peningkatan{% else %}Penurunan{% endif %})</span>
+                    </div>
+                </div>
+
+                <!-- Recommendation box -->
+                <div class="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg p-4 flex items-start gap-3">
+                    <i data-lucide="info" class="w-4 h-4 shrink-0 text-indigo-400 mt-0.5"></i>
+                    <div class="text-xs">
+                        <strong class="font-mono uppercase tracking-wider text-[10px] block mb-1">Rekomendasi Operasional:</strong>
+                        <p class="leading-relaxed opacity-90">{{ prediction_result.rekomendasi }}</p>
+                    </div>
+                </div>
+
+            </div>
+            {% else %}
+            <!-- Results Placeholder -->
+            <div class="glass-panel rounded-xl border border-slate-900/60 flex flex-col items-center justify-center gap-3 py-24 flex-1 shadow-lg">
+                <i data-lucide="brain-circuit" class="w-12 h-12 text-slate-800 animate-pulse"></i>
+                <p class="text-xs font-mono text-slate-500 text-center leading-relaxed">
+                    Pilih wilayah kecamatan dan atur parameter di kiri,<br>kemudian klik <strong class="text-slate-400">Jalankan Prediksi AI</strong> untuk melihat estimasi.
+                </p>
+            </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <!-- Bottom: History -->
+    <div class="glass-panel rounded-xl overflow-hidden shadow-lg border border-slate-900/60">
+        <div class="px-5 py-4 border-b border-slate-900/60">
+            <h3 class="text-xs font-mono font-semibold text-slate-400 uppercase tracking-widest">Riwayat Log Prediksi Terakhir</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead>
+                    <tr class="border-b border-slate-900/40 text-slate-400 font-mono uppercase text-[10px]">
+                        <th class="px-5 py-3">Tanggal Run</th>
+                        <th class="px-5 py-3">Nama Wilayah</th>
+                        <th class="px-5 py-3">Volume Baseline</th>
+                        <th class="px-5 py-3">Hasil Prediksi</th>
+                        <th class="px-5 py-3">MAPE Confidence</th>
+                        <th class="px-5 py-3">Model Version</th>
+                        <th class="px-5 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-900/20">
+                    {% for h in history %}
+                    <tr class="hover:bg-slate-900/30 transition-colors">
+                        <td class="px-5 py-3 font-mono text-slate-400">{{ h.tanggal }}</td>
+                        <td class="px-5 py-3 font-bold text-slate-200">{{ h.district.nama if h.district else 'Tidak Diketahui' }}</td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ h.volume_aktual }} <span class="text-slate-500 text-[10px]">ton</span></td>
+                        <td class="px-5 py-3 font-mono font-bold text-emerald-400">{{ h.volume_prediksi }} <span class="text-slate-500 text-[10px] font-normal">ton</span></td>
+                        <td class="px-5 py-3 font-mono text-slate-300">{{ h.akurasi }}%</td>
+                        <td class="px-5 py-3 font-mono text-slate-400">{{ h.model_version }}</td>
+                        <td class="px-5 py-3">
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 font-mono">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Saved
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not history %}
+                    <tr>
+                        <td colSpan="7" class="px-5 py-10 text-center font-mono text-slate-500">Belum ada riwayat log prediksi.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Local dictionary of district parameters compiled from DB
+    const districtFeatures = {
+        {% for d in districts %}
+        "{{ d.id }}": {
+            "populasi": {{ d.populasi }},
+            "luas_wilayah": {{ d.luas_wilayah }},
+            "kepadatan_penduduk": {{ d.kepadatan_penduduk }},
+            "pendapatan": {{ d.pendapatan|int }},
+            "wisatawan": {{ d.wisatawan }},
+            "horeca": {{ d.total_horeca_waste_index }},
+            "iot": {{ d.avg_iot_fill_level }}
+        },
+        {% endfor %}
+    };
+
+    /**
+     * Automatically populate parameter fields upon district selection.
+     */
+    function loadDistrictFeatures(selectEl) {
+        const dId = selectEl.value;
+        
+        if (dId && districtFeatures[dId]) {
+            const data = districtFeatures[dId];
+            document.getElementById("f_populasi").value = data.populasi;
+            document.getElementById("f_luas").value = data.luas_wilayah;
+            document.getElementById("f_kepadatan").value = data.kepadatan_penduduk;
+            document.getElementById("f_wisatawan").value = data.wisatawan;
+            document.getElementById("f_horeca").value = data.horeca.toFixed(2);
+            document.getElementById("f_iot").value = data.iot.toFixed(1);
+            document.getElementById("f_pendapatan").value = data.pendapatan;
+        } else {
+            // Reset fields
+            document.getElementById("f_populasi").value = "";
+            document.getElementById("f_luas").value = "";
+            document.getElementById("f_kepadatan").value = "";
+            document.getElementById("f_wisatawan").value = "";
+            document.getElementById("f_horeca").value = "";
+            document.getElementById("f_iot").value = "";
+            document.getElementById("f_pendapatan").value = "";
+        }
+    }
+</script>
+{% endblock %}

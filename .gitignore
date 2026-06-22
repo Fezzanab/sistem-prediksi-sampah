@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# SQLite DB files
+/instance/*.db
+sistem_prediksi_sampah.db
+
+# Editor files
+.vscode/
+*.swp
